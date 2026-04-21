@@ -1,0 +1,118 @@
+PANDUAN LENGKAP: PROGRAM DETEKSI TANGAN UNTUK KONTROL VIDEO
+==========================================================
+Dibuat untuk: IG.STORE
+Project: KICAU
+==========================================================
+
+1. PERSIAPAN LINGKUNGAN (VIRTUAL ENVIRONMENT)
+---------------------------------------------
+Pastikan Anda berada di dalam folder project 'KICAU'.
+Aktifkan .venv Anda, lalu instal library berikut:
+
+   pip install opencv-python mediapipe pyautogui
+
+Jika terjadi error pada mediapipe (AttributeError), gunakan perintah ini:
+   pip install mediapipe --no-cache-dir --force-reinstall
+
+2. STRUKTUR FOLDER
+------------------
+Pastikan susunan file Anda seperti ini agar program tidak error:
+KICAU/
+├── .venv/
+├── vidio/
+│   └── TT_1776679567560.mp4  (File video Anda)
+└── main.py                   (File kode utama)
+
+3. KODE PROGRAM (main.py)
+-------------------------
+import cv2
+import mediapipe as mp
+import time
+
+# --- KONFIGURASI ---
+VIDEO_PATH = "vidio/TT_1776679567560.mp4"
+WINDOW_NAME = "Video Player - IG.STORE"
+
+# Inisialisasi MediaPipe
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=1,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.7
+)
+mp_draw = mp.solutions.drawing_utils
+
+# Inisialisasi Kamera
+cap = cv2.VideoCapture(0)
+video_cap = None
+is_video_playing = False
+
+def check_hand_open(hand_landmarks):
+    # Logika: Jika ujung jari (8,12,16,20) lebih tinggi dari buku jari tengahnya
+    tips = [8, 12, 16, 20]
+    count = 0
+    for tip in tips:
+        if hand_landmarks.landmark[tip].y < hand_landmarks.landmark[tip - 2].y:
+            count += 1
+    return count >= 3
+
+print("IG.STORE System Active! Buka tangan untuk PLAY, kepal tangan untuk CLOSE.")
+
+while cap.isOpened():
+    success, frame = cap.read()
+    if not success: break
+
+    frame = cv2.flip(frame, 1)
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = hands.process(rgb_frame)
+
+    any_hand_open = False
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            if check_hand_open(hand_landmarks):
+                any_hand_open = True
+
+    # LOGIKA PLAYBACK OTOMATIS
+    if any_hand_open:
+        if not is_video_playing:
+            video_cap = cv2.VideoCapture(VIDEO_PATH)
+            is_video_playing = True
+            cv2.namedWindow(WINDOW_NAME)
+            # Mengatur jendela ke sebelah kanan
+            cv2.moveWindow(WINDOW_NAME, 1100, 150)
+        
+        ret, v_frame = video_cap.read()
+        if ret:
+            cv2.imshow(WINDOW_NAME, v_frame)
+        else:
+            # Loop video jika habis
+            video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    else:
+        # Hapus jendela jika tangan mengepal/hilang
+        if is_video_playing:
+            cv2.destroyWindow(WINDOW_NAME)
+            if video_cap: video_cap.release()
+            is_video_playing = False
+
+    cv2.imshow("Hand Tracker (Camera) - IG.STORE", frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'): break
+
+cap.release()
+if video_cap: video_cap.release()
+cv2.destroyAllWindows()
+
+4. CARA MENJALANKAN
+-------------------
+Buka terminal di VS Code (pastikan di folder KICAU), lalu ketik:
+
+   python main.py
+
+5. TROUBLESHOOTING
+------------------
+- Video Tidak Muncul: Cek apakah nama file di VIDEO_PATH sudah sama persis.
+- Jendela Kurang ke Kanan: Ubah angka '1100' di cv2.moveWindow menjadi lebih besar.
+- Kamera Tidak Terbuka: Pastikan tidak ada aplikasi lain yang sedang menggunakan kamera.
+
+==========================================================
